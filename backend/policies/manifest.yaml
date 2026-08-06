@@ -1,0 +1,51 @@
+agent_control_specification_version: "0.3.1-beta"
+metadata:
+  name: agt-dashboard-governance
+  version: "1.0.0"
+
+extends: []
+
+annotators:
+  prompt_injection:
+    type: classifier
+  pii_scan:
+    type: classifier
+
+policies:
+  opa_agent_policy:
+    type: custom
+    adapter: opa_remote
+
+intervention_points:
+  input:
+    policy_target: $.input.message
+    policy_target_kind: user_message
+    annotations:
+      prompt_injection:
+        from: $policy_target
+      pii_scan:
+        from: $policy_target
+    policy:
+      id: opa_agent_policy
+
+  pre_tool_call:
+    policy_target: $.tool_call.args
+    policy_target_kind: tool_args
+    tool_name_from: $.tool_call.name
+    annotations:
+      pii_scan:
+        from: $policy_target
+    policy:
+      id: opa_agent_policy
+
+tools:
+  send_email:
+    clearance: internal
+  query_database:
+    clearance: internal
+  web_search:
+    clearance: public
+  summarize:
+    clearance: public
+  execute_shell:
+    clearance: internal

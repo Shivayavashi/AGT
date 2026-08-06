@@ -1,0 +1,70 @@
+# AGT YAML Policy — governance.toolkit/v1
+# This policy is evaluated by the built-in PolicyEngine
+apiVersion: governance.toolkit/v1
+name: multi-unit-governance-policy
+version: "1.0"
+default_action: deny
+
+rules:
+  # ── Universally Blocked Tools ──
+  - name: block-destructive-tools
+    condition: "action.type in ['drop_table', 'delete_database', 'rm_rf', 'execute_shell', 'format_disk']"
+    action: deny
+    description: "Destructive operations are universally blocked"
+
+  # ── Role-Based Tool Access ──
+  - name: analyst-tool-access
+    condition: "role == 'analyst' and action.type in ['query_database', 'web_search', 'summarize', 'read_file']"
+    action: allow
+    description: "Analysts can query, search, summarize, and read"
+
+  - name: reviewer-tool-access
+    condition: "role == 'reviewer' and action.type in ['query_database', 'web_search', 'summarize', 'read_file', 'write_report']"
+    action: allow
+    description: "Reviewers can also write reports"
+
+  - name: admin-full-access
+    condition: "role == 'admin' and action.type not in ['drop_table', 'delete_database', 'rm_rf', 'execute_shell', 'format_disk']"
+    action: allow
+    description: "Admins have full access except destructive ops"
+
+  # ── Approval Required for send_email ──
+  - name: email-requires-approval
+    condition: "action.type == 'send_email'"
+    action: require_approval
+    approvers: ["security-team", "admin"]
+    description: "Sending emails requires human approval"
+
+  # ── Model Access ──
+  - name: restrict-models-to-unit
+    condition: "action.type == 'model_call' and action.model != '' and action.model not in allowed_models"
+    action: deny
+    description: "Only whitelisted models per unit/role"
+
+  - name: allow-model-call
+    condition: "action.type == 'model_call' and (action.model == '' or action.model in allowed_models)"
+    action: allow
+    description: "Model call allowed if model is in allowlist"
+
+  # ── PII Protection ──
+  - name: block-pii-for-non-privileged
+    condition: "can_access_pii == False and action.contains_pii == True"
+    action: deny
+    description: "PII access requires explicit role permission"
+
+  # ── MCP Tool Governance ──
+  - name: mcp-tool-allowed
+    condition: "action.type == 'mcp_tool_call' and action.mcp_server in mcp_servers_allowed"
+    action: allow
+    description: "MCP tools allowed for configured servers"
+
+  - name: mcp-tool-denied
+    condition: "action.type == 'mcp_tool_call' and action.mcp_server not in mcp_servers_allowed"
+    action: deny
+    description: "MCP tools restricted to allowed servers per unit"
+
+  # ── General chat / conversation ──
+  - name: allow-chat
+    condition: "action.type in ['chat', 'conversation', 'message']"
+    action: allow
+    description: "General conversation is allowed"
